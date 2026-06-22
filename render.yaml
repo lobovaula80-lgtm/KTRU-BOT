@@ -1,6 +1,7 @@
 services:
   - type: web
     name: ktru-bot
+    runtime: python
     region: oregon
     plan: free
     branch: main
