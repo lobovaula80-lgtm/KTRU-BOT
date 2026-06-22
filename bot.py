@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 import os
+import threading
 from flask import Flask
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -33,7 +34,8 @@ def ktru_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     update.message.reply_text(response)
 
-def main():
+def run_bot():
+    """Запуск Telegram бота в отдельном потоке"""
     if not TOKEN:
         raise ValueError("BOT_TOKEN не найден в env!")
 
@@ -41,9 +43,14 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ktru_search))
 
-    # Запускаем polling для Telegram
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.start()
+    application.updater.start_polling(drop_pending_updates=True)
+    application.run_until_done()
 
 if __name__ == "__main__":
-    # Запускаем Flask, чтобы Render видел открытый порт
+    # Запускаем Telegram бота в отдельном потоке
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+
+    # Запускаем Flask сервер в main thread
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
