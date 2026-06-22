@@ -1,17 +1,23 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 import os
-import threading
-import asyncio
-from flask import Flask
+from flask import Flask, request, jsonify
 
 TOKEN = os.getenv("BOT_TOKEN")
+PORT = int(os.getenv("PORT", 8000))
+SERVICE_URL = f"https://ktru-bot.onrender.com"
 
 app = Flask(__name__)
 
 @app.route("/health")
 def health():
     return {"status": "ok"}, 200
+
+@app.route(f"/webhook/{TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.decompress(request.get_data())
+    asyncio.create_task(application.process_update(update))
+    return jsonify({"result": "ok"}), 200
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -35,27 +41,31 @@ async def ktru_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(response)
 
-async def run_bot():
-    """Запуск Telegram бота через asyncio"""
-    if not TOKEN:
-        raise ValueError("BOT_TOKEN не найден в env!")
-
-    application = Application.builder().token(TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ktru_search))
-
-    await application.run_polling()
-
-def run_bot_thread():
-    """Точка входа для threading.Thread"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_bot())
+application = Application.builder().token(TOKEN).build()
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ktru_search))
 
 if __name__ == "__main__":
-    # Запускаем Telegram бота в отдельном потоке с новым event loop
-    bot_thread = threading.Thread(target=run_bot_thread, daemon=True)
-    bot_thread.start()
-
-    # Запускаем Flask сервер в main thread
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    # Установка webhook
+    import asyncio
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(
+        application.start_webhook(
+            webhook_path=f"/webhook/{TOKEN}",
+            url=SERVICE_URL,
+            port=PORT,
+            sock=None,
+            ssl_ctx=None,
+            openssl_kwargs=None
+        )
+    )
+    loop.run_until_complete(application.updater.stop())
+    application.run_webhook(
+        webhook_path=f"/webhook/{TOKEN}",
+        url=SERVICE_URL,
+        port=PORT,
+        sock=None,
+        ssl_ctx=None,
+        openssl_kwargs=None,
+        address="0.0.0.0"
+    )
