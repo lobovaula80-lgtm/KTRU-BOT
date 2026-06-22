@@ -1,5 +1,5 @@
 services:
-  - type: web
+  - type: worker
     name: ktru-bot
     runtime: python
     region: oregon
