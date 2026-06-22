@@ -1,10 +1,10 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 import os
+from flask import Flask
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-from flask import Flask
 app = Flask(__name__)
 
 @app.route("/health")
@@ -36,11 +36,14 @@ def ktru_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     if not TOKEN:
         raise ValueError("BOT_TOKEN не найден в env!")
-    
+
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ktru_search))
+
+    # Запускаем polling для Telegram
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    main()
+    # Запускаем Flask, чтобы Render видел открытый порт
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
