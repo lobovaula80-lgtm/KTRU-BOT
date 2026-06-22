@@ -1,17 +1,8 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 import os
-import threading
-import asyncio
-from flask import Flask
 
 TOKEN = os.getenv("BOT_TOKEN")
-
-app = Flask(__name__)
-
-@app.route("/health")
-def health():
-    return {"status": "ok"}, 200
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -35,8 +26,7 @@ async def ktru_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(response)
 
-async def run_bot():
-    """Запуск Telegram бота через asyncio"""
+if __name__ == "__main__":
     if not TOKEN:
         raise ValueError("BOT_TOKEN не найден в env!")
 
@@ -44,18 +34,4 @@ async def run_bot():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ktru_search))
 
-    await application.run_polling()
-
-def run_bot_thread():
-    """Точка входа для threading.Thread"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_bot())
-
-if __name__ == "__main__":
-    # Запускаем Telegram бота в отдельном потоке с новым event loop
-    bot_thread = threading.Thread(target=run_bot_thread, daemon=True)
-    bot_thread.start()
-
-    # Запускаем Flask сервер в main thread
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    application.run_polling(drop_pending_updates=True)
